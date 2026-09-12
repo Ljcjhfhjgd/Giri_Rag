@@ -220,6 +220,80 @@ EOF
 
 ---
 
+### 1.11 数据存储规划（文档与切片放哪、要不要挪到独立磁盘）
+
+`data/` 是纯运行时目录，**不进 git**，服务器上首次启动会自动创建：
+
+```
+data/
+├── jirui.db       业务库：账号 / 知识库 / 权限规则 / 会话
+├── index/
+│   └── chunks.db  切片正文 + 向量 + FTS5 全文索引
+└── uploads/
+    ├── kb_<id>/<日期>/<uuid>.<ext>   原始文档
+    └── attachments/<日期>/<uuid>.<ext>  提问附件
+```
+
+**三个子目录的重建能力完全不同，决定了备份优先级：**
+
+| 路径 | 能否重建 | 备份优先级 |
+|---|---|---|
+| `jirui.db` | ❌ 不可重建 —— 权限规则、账号只存在这里 | 🔴 必做 |
+| `uploads/` | ❌ 原始文档删了就没了 | 🔴 必做 |
+| `index/chunks.db` | ✅ **可从 `uploads/` 全量重新解析重建** | 🟡 可选（重建要重跑嵌入，耗时） |
+
+> 关键点：切片的「真相」在原始文档里，`chunks.db` 只是派生物。
+> 所以真正要保命的是 `jirui.db` 和 `uploads/`。
+> `scripts/backup.sh` 三个都备，是按最坏情况设计的。
+
+#### 默认位置
+
+由 `run_local.py` 硬编码为 `<项目根>/data`，即 `/opt/jirui/app/data`。
+
+#### 文档量大时：挪到独立磁盘
+
+**方案 A —— 软链接（零代码改动，最省事）**
+
+```bash
+systemctl stop jirui
+mkdir -p /mnt/data/jirui
+mv /opt/jirui/app/data/* /mnt/data/jirui/
+rmdir /opt/jirui/app/data
+ln -s /mnt/data/jirui /opt/jirui/app/data
+chown -R jirui:jirui /mnt/data/jirui
+systemctl start jirui
+```
+
+**方案 B —— bind mount（更稳，重启后自动生效）**
+
+```bash
+mkdir -p /mnt/data/jirui /opt/jirui/app/data
+# 写入 /etc/fstab：
+#   /mnt/data/jirui  /opt/jirui/app/data  none  bind  0 0
+mount -a
+chown -R jirui:jirui /mnt/data/jirui
+```
+
+> 若想让 `data/` 改用后台可配的 `DATA_DIR`，必须先删掉 `run_local.py` 里这两行硬编码：
+> `os.environ["DATA_DIR"] = ...` 与 `os.environ["INDEX_DB_PATH"] = ...`
+> （`INDEX_DB_PATH` 留空时会自动按 `DATA_DIR` 推导为 `<DATA_DIR>/index/chunks.db`）。
+> 不改这两行，`.env` 里的 `DATA_DIR` 是不生效的。
+
+#### 首次部署时把现有文档搬上去
+
+```bash
+# 在开发机执行；rsync 支持断点续传，比 scp 稳
+rsync -avz --progress data/ root@服务器:/opt/jirui/app/data/
+
+# 传完修正属主
+ssh root@服务器 'chown -R jirui:jirui /opt/jirui/app/data'
+```
+
+想从零开始也行 —— 不传任何数据，服务器首次启动会自己建好目录结构，
+之后通过后台【知识库】逐份上传即可。
+
+---
+
 ## 2. 日常更新
 
 在**你的开发机**上：
