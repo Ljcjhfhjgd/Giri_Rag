@@ -38,8 +38,9 @@ data/
 !data/.gitkeep
 
 # Model files and directories (Large models downloaded via scripts/download_models.py)
-models/
-!models/.gitkeep
+# ⚠️ 必须锚定仓库根，否则会误伤 backend/app/models/ 源码包
+/models/
+!/models/.gitkeep
 
 # Backups & temp files
 *.bak
