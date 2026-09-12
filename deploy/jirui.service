@@ -1,0 +1,46 @@
+[Unit]
+Description=极睿知识库 (Jirui Knowledge Base)
+Documentation=file:///opt/jirui/app/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jirui
+Group=jirui
+WorkingDirectory=/opt/jirui/app
+
+# run_local.py 是本项目"前后端一体化托管"的正式入口：
+# 它同时挂载 FastAPI 路由与 web/ 静态前端，所以在服务端也用它，而不是裸跑 uvicorn。
+# 注意：run_local.py 内部会把 DATA_DIR / LOCAL_EMBEDDING_DIR / INDEX_DB_PATH
+#       覆盖为项目根目录下的相对路径，因此下面这些 Environment 里同名的项不会生效，
+#       但仍保留供其他配置项使用。
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=-/opt/jirui/app/backend/.env
+
+ExecStart=/opt/jirui/venv/bin/python /opt/jirui/app/run_local.py
+
+Restart=always
+RestartSec=5
+# 小内存机器上给足启动时间（首次加载 ONNX 模型需要几秒）
+TimeoutStartSec=120
+# 优雅停止：给在途的问答与入库任务留出收尾时间
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# ---- 内存闸门（2 GiB 机器强烈建议保留）----
+# 让 cgroup 先杀本服务，而不是让内核 OOM killer 随机挑进程。
+# 极端情况下内核可能挑中 sshd 或 nginx，那你就彻底上不了机器了。
+MemoryMax=1400M
+MemorySwapMax=0
+
+# ---- 安全加固 ----
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/jirui/app/data /opt/jirui/app/logs /opt/jirui/app/models
+
+[Install]
+WantedBy=multi-user.target

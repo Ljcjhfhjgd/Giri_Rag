@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment variables
+# 注意：.env 是"精确匹配"，只忽略名为 .env 的文件。
+# 已经跟踪过的文件不受这里的规则影响，必须用 git rm --cached 取消跟踪。
+.env
+.env.local
+.env.*.local
+# .env.example 是模板，允许提交（上面的规则不会匹配到它）
+
+# Logs
+logs/
+*.log
+
+# Data and uploads
+data/
+!data/.gitkeep
+
+# Model files and directories (Large models downloaded via scripts/download_models.py)
+models/
+!models/.gitkeep
+
+# Backups & temp files
+*.bak
+*.tmp
+*.temp
+
+# 部署产物
+deploy/volumes/
+releases/
+*.blockmap
+
+# 工具/助手工作目录（本地分析记录，不入库）
+.workbuddy/
